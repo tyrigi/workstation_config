@@ -1,0 +1,13 @@
+set show-all-if-ambiguous on
+"\eOR":" 2>&1 | tee /lastrun.txt\C-m"
+"\002":"\C-e &>/dev/null &\C-m"
+"\e[A":history-search-backward
+"\e[B":history-search-forward
+"\033[1;5D":backward-word
+"\033[1;5C":forward-word
+"\006":"\C-ufind -name \"\C-y\" -type f\C-m"
+"\ef":"\C-ufind -name \"\C-y\"\C-m"
+"\033\006":"\C-uegrep -lr \"\C-y\" ./\C-m"
+"\033OQ":"if [ $(pwd) == $HOME ]; then cd $OLD_DIR; else export OLD_DIR=`pwd`; cd $HOME; fi\C-m"
+"\eOS":"kate /lastrun.txt &>/dev/null &\C-m"
+"\eb":"cd $OLDPWD\C-m"
