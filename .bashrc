@@ -78,6 +78,9 @@ if [ -f /etc/bash_completion ]; then
 . /etc/bash_completion
 fi
 
+# Clear getopts in case it's been used and not cleared previously
+OPTIND=1
+
 #Frequently used environment variables
 export JAVA_HOME=/usr/lib/jvm/java-8-oracle
 export GTEST_DIR=/home/tyler/Build_Tools/googletest
@@ -96,6 +99,14 @@ export ANDROIDNDKVER=r10e
 #Python auto-complete fix
 export PYTHONSTARTUP=$HOME/.pythonrc
 
+#Android Tablet quick names
+export NEX1="0af1a5c2"
+export NEX2="0a07be3c"
+export NEX3="0a183044"
+export NEX4="0ad2c7e5"
+export NEX5="0ac0e0c6"
+export NEX6="0b01c262"
+
 #Frequently used commands
 alias get-id="git rev-parse HEAD | xclip -select c && xclip -selection c -o"
 alias refresh="source ~/.bashrc"
@@ -103,6 +114,7 @@ alias dirs="dirs -v"
 alias cd="HOME=/home/tyler/Alljoyn cd"
 
 #Functions to speed up testing
+
         #Quickly find *.so library for test binaries
         #TODO: add failsafes for non-existant/unfindable files
 function ajn_lib () {
@@ -131,6 +143,7 @@ function ajn_lib () {
         echo $LD_LIBRARY_PATH
 	done
 }
+
         #Quickly download all testing repositories with specified branch
 function pull-all() {
         RUNDIR=$(pwd)
@@ -152,32 +165,63 @@ function pull-all() {
 	(cd services && git clone https://git.allseenalliance.org/gerrit/services/base_tcl.git -b $1)
         cd $RUNDIR
 }
+
         #Navigate to specified file (fast way to get to test binaries)
         #TODO: add failsafes for non-existant/unfindable files
+function cdto() {
+  unset path
+  unset destination
+  if [ "$1" == "" ]; then
+    echo "Please specify a target."
+    break
+  else
+    while true; do
+      if [[ $(find $path -maxdepth 1 -name ".root.flag" -type f -exec echo "{}" \;) ]]; then
+        echo "$1 not found"
+        break
+      else
+        if [[ $(find $path -maxdepth 20 -name "$1" -type f -not -path "*/obj/*" -exec echo "{}" \;) ]]; then
+          cd $(dirname `find $path -maxdepth 10 -name "$1" -type f -not -path "*/obj/*" -exec echo "{}" \; | head -n 1`)
+          break
+        fi
+      fi
+    done
+  fi
+}
+
+# Version of moveto that uses pushd
+function pushto() {
+  unset path
+  unset destination
+  if [ "$1" == "" ]; then
+    echo "Please specify a target."
+    break
+  else
+    while true; do
+      if [[ $(find $path -maxdepth 1 -name ".root.flag" -type f -exec echo "{}" \;) ]]; then
+        echo "$1 not found"
+        break
+      else
+        if [[ $(find $path -maxdepth 20 -name "$1" -type f -not -path "*/obj/*" -exec echo "{}" \;) ]]; then
+          pushd $(dirname `find $path -maxdepth 10 -name "$1" -type f -not -path "*/obj/*" -exec echo "{}" \; | head -n 1`)
+          break
+        fi
+      fi
+    done
+  fi
+}
+
+# Select either cdto or pushmove
 function moveto() {
-	unset path
-	unset destination
-	for i in `seq 1 10`;
-	do
-	if [ "$1" == "" ]; then
-		break
-	else
-	while true
-	do
-	if [[ $(find $path -maxdepth 1 -name ".root.flag" -type f -exec echo "{}" \;) ]]; then
-                echo "$1 not found"
-                break
-        else
-	if [[ $(find $path -maxdepth 20 -name "$1" -type f -not -path "*/obj/*" -exec echo "{}" \;) ]]; then
-		cd $(dirname `find $path -maxdepth 10 -name "$1" -type f -not -path "*/obj/*" -exec echo "{}" \; | head -n 1`)
-		break
-	fi
-	fi
-	path="$path../"
-	done
-	fi
-	shift
-	done
+  while getopts ":p" opt; do
+    case "$opt" in
+      p)
+      	echo "Pushing to $2"
+        pushto $2
+        ;;
+    esac
+  done
+  cdto $1
 }
         #Go back up to the repository root (whatever directory has the SConstruct file)
 function moveup() {
@@ -216,6 +260,13 @@ function swapbuild() {
 # Debug Stand-alone Router
 # Release Stand-alone Router
 function update-alljoyn() {
+    unset GET1
+    unset GET2
+    unset GET3
+    unset GET4
+    unset GET5
+    unset GET6
+    unset GET7
     export RED='\033[0;31m'
     export GREEN='\033[0;32m'
     export NC='\033[0m'
@@ -243,88 +294,151 @@ function update-alljoyn() {
         cd ~/Alljoyn/oprt/tp-link/; rm -rf alljoyn
         git clone https://git.allseenalliance.org/gerrit/core/alljoyn.git -b RB16.10 &>/dev/null &
         GET6=$!
+        cd ~/Alljoyn/oprt/archer/; rm -rf alljoyn
+        git clone https://git.allseenalliance.org/gerrit/core/alljoyn.git -b RB16.10 &>/dev/null &
+        GET7=$!
         echo "Building Debug with Bundled Router"
         echo "Alljoyn Core..."
-        cd ~/Alljoyn/bundle-deb/core/alljoyn 
         wait $GET1
-        scons BINDINGS=c,cpp,java VARIANT=debug BR=on --jobs=4 &>/dev/null 
+        mkdir -p ~/Alljoyn/bundle-deb/.logs/
+        cd ~/Alljoyn/bundle-deb/core/alljoyn
+        scons BINDINGS=c,cpp,java VARIANT=debug BR=on --jobs=4 &>~/Alljoyn/bundle-deb/.logs/ajn.log
         if [ $? -eq 0 ]; then echo -e "${GREEN}Successful build.${NC}"; else echo -e "${RED}There were errors!${NC}"; fi
         echo "AllJoyn Thin Core..."
-        cd ~/Alljoyn/bundle-deb/core/ajtcl 
-        scons BINDINGS=c,cpp,java VARIANT=debug BR=on --jobs=4 &>/dev/null 
+        cd ~/Alljoyn/bundle-deb/core/ajtcl
+        scons BINDINGS=c,cpp,java VARIANT=debug BR=on --jobs=4 &>~/Alljoyn/bundle-deb/.logs/ajtcl.log
         if [ $? -eq 0 ]; then echo -e "${GREEN}Successful build.${NC}"; else echo -e "${RED}There were errors!${NC}"; fi
         echo "AllJoyn Test Tools..."
-        cd ~/Alljoyn/bundle-deb/core/test/scl 
-        scons BINDINGS=c,cpp,java VARIANT=debug BR=on --jobs=4 &>/dev/null 
+        cd ~/Alljoyn/bundle-deb/core/test/scl
+        scons BINDINGS=c,cpp,java VARIANT=debug BR=on --jobs=4 &>~/Alljoyn/bundle-deb/.logs/test.log
         if [ $? -eq 0 ]; then echo -e "${GREEN}Successful build.${NC}"; else echo -e "${RED}There were errors!${NC}"; fi
         echo "Building Release with Bundled Router"
         echo "AllJoyn Core..."
-        cd ~/Alljoyn/bundle-rel/core/alljoyn 
         wait $GET2
-        scons BINDINGS=c,cpp,java VARIANT=release BR=on --jobs=4 &>/dev/null 
+        mkdir -p ~/Alljoyn/bundle-rel/.logs/
+        cd ~/Alljoyn/bundle-rel/core/alljoyn
+        scons BINDINGS=c,cpp,java VARIANT=release BR=on --jobs=4 &>~/Alljoyn/bundle-rel/.logs/ajn.log
         if [ $? -eq 0 ]; then echo -e "${GREEN}Successful build.${NC}"; else echo -e "${RED}There were errors!${NC}"; fi
         echo "AllJoyn Thin Core..."
-        cd ~/Alljoyn/bundle-rel/core/ajtcl 
-        scons BINDINGS=c,cpp,java VARIANT=release BR=on --jobs=4 &>/dev/null 
+        cd ~/Alljoyn/bundle-rel/core/ajtcl
+        scons BINDINGS=c,cpp,java VARIANT=release BR=on --jobs=4 &>~/Alljoyn/bundle-rel/.logs/ajtcl.log
         if [ $? -eq 0 ]; then echo -e "${GREEN}Successful build.${NC}"; else echo -e "${RED}There were errors!${NC}"; fi
         echo "AllJoyn Test Tools..."
-        cd ~/Alljoyn/bundle-rel/core/test/scl 
-        scons BINDINGS=c,cpp,java VARIANT=release BR=on --jobs=4 &>/dev/null 
+        cd ~/Alljoyn/bundle-rel/core/test/scl
+        scons BINDINGS=c,cpp,java VARIANT=release BR=on --jobs=4 &>~/Alljoyn/bundle-rel/.logs/test.log
         if [ $? -eq 0 ]; then echo -e "${GREEN}Successful build.${NC}"; else echo -e "${RED}There were errors!${NC}"; fi
         echo "Building Debug with Stand-alone Router"
         echo "AllJoyn Core..."
-        cd ~/Alljoyn/solo-deb/core/alljoyn 
         wait $GET3
-        scons BINDINGS=c,cpp,java VARIANT=debug BR=off --jobs=4 &>/dev/null 
+        mkdir -p ~/Alljoyn/solo-deb/.logs/
+        cd ~/Alljoyn/solo-deb/core/alljoyn
+        scons BINDINGS=c,cpp,java VARIANT=debug BR=off --jobs=4 &>~/Alljoyn/solo-deb/.logs/ajn.log
         if [ $? -eq 0 ]; then echo -e "${GREEN}Successful build.${NC}"; else echo -e "${RED}There were errors!${NC}"; fi
         echo "AllJoyn Thin Core..."
-        cd ~/Alljoyn/solo-deb/core/ajtcl 
-        scons BINDINGS=c,cpp,java VARIANT=debug BR=off --jobs=4 &>/dev/null 
+        cd ~/Alljoyn/solo-deb/core/ajtcl
+        scons BINDINGS=c,cpp,java VARIANT=debug BR=off --jobs=4 &>~/Alljoyn/solo-deb/.logs/ajtcl.log
         if [ $? -eq 0 ]; then echo -e "${GREEN}Successful build.${NC}"; else echo -e "${RED}There were errors!${NC}"; fi
         echo "AllJoyn Test Tools..."
-        cd ~/Alljoyn/solo-deb/core/test/scl 
-        scons BINDINGS=c,cpp,java VARIANT=debug BR=off --jobs=4 &>/dev/null 
+        cd ~/Alljoyn/solo-deb/core/test/scl
+        scons BINDINGS=c,cpp,java VARIANT=debug BR=off --jobs=4 &>~/Alljoyn/solo-deb/.logs/test.log
         if [ $? -eq 0 ]; then echo -e "${GREEN}Successful build.${NC}"; else echo -e "${RED}There were errors!${NC}"; fi
         echo "Building Release with Stand-alone Router"
         echo "AllJoyn Core..."
-        cd ~/Alljoyn/solo-rel/core/alljoyn 
         wait $GET4
-        scons BINDINGS=c,cpp,java VARIANT=release BR=off --jobs=4 &>/dev/null 
+        mkdir -p ~/Alljoyn/solo-rel/.logs/
+        cd ~/Alljoyn/solo-rel/core/alljoyn
+        scons BINDINGS=c,cpp,java VARIANT=release BR=off --jobs=4 &>~/Alljoyn/solo-rel/.logs/ajn.log
         if [ $? -eq 0 ]; then echo -e "${GREEN}Successful build.${NC}"; else echo -e "${RED}There were errors!${NC}"; fi
         echo "AllJoyn Thin Core..."
-        cd ~/Alljoyn/solo-rel/core/ajtcl 
-        scons BINDINGS=c,cpp,java VARIANT=release BR=off --jobs=4 &>/dev/null 
+        cd ~/Alljoyn/solo-rel/core/ajtcl
+        scons BINDINGS=c,cpp,java VARIANT=release BR=off --jobs=4 &>~/Alljoyn/solo-rel/.logs/ajtcl.log
         if [ $? -eq 0 ]; then echo -e "${GREEN}Successful build.${NC}"; else echo -e "${RED}There were errors!${NC}"; fi
         echo "AllJoyn Test Tools..."
-        cd ~/Alljoyn/solo-rel/core/test/scl 
-        scons BINDINGS=c,cpp,java VARIANT=release BR=off --jobs=4 &>/dev/null 
+        cd ~/Alljoyn/solo-rel/core/test/scl
+        scons BINDINGS=c,cpp,java VARIANT=release BR=off --jobs=4 &>~/Alljoyn/solo-rel/.logs/test.log
         if [ $? -eq 0 ]; then echo -e "${GREEN}Successful build.${NC}"; else echo -e "${RED}There were errors!${NC}"; fi
 
         echo "Building Linksys Packages"
-        cd ~/Alljoyn/oprt/linksys/openwrt
         wait $GET5
-        make package/feeds/alljoyn/alljoyn/clean &>/dev/null
-        make package/feeds/alljoyn/alljoyn/prepare &>/dev/null
-        make package/feeds/alljoyn/alljoyn/compile -j5 &>/dev/null
+        mkdir -p ~/Alljoyn/oprt/linksys/.logs/
+        cd ~/Alljoyn/oprt/linksys/openwrt
+        make package/feeds/alljoyn/alljoyn/clean V=s &>~/Alljoyn/oprt/linksys/.logs/clean.log
+        make package/feeds/alljoyn/alljoyn/prepare V=s &>~/Alljoyn/oprt/linksys/.logs/prepare.log
+        make package/feeds/alljoyn/alljoyn/compile -j5 V=s &>~/Alljoyn/oprt/linksys/.logs/build.log
         echo "Building TP-Link Packages"
         wait $GET6
-        make package/feeds/alljoyn/alljoyn/clean &>/dev/null
-        make package/feeds/alljoyn/alljoyn/prepare &>/dev/null
-        make package/feeds/alljoyn/alljoyn/compile -j5 &>/dev/null
-        cd ~/Alljoyn
-        echo "All Done!"        
+        mkdir -p ~/Alljoyn/oprt/tp-link/.logs/
+        cd ~/Alljoyn/oprt/tp-link/openwrt
+        make package/feeds/alljoyn/alljoyn/clean V=s &>~/Alljoyn/oprt/tp-link/.logs/clean.log
+        make package/feeds/alljoyn/alljoyn/prepare V=s &>~/Alljoyn/oprt/tp-link/.logs/prepare.log
+        make package/feeds/alljoyn/alljoyn/compile -j5 V=s &>~/Alljoyn/oprt/tp-link/.logs/build.log
+        echo "Building Archer Packages"
+        wait $GET7
+        mkdir -p ~/Alljoyn/oprt/archer/.logs/
+        cd ~/Alljoyn/oprt/archer/openwrt
+        make package/feeds/alljoyn/alljoyn/clean V=s &>~/Alljoyn/oprt/archer/.logs/clean.log
+        make package/feeds/alljoyn/alljoyn/prepare V=s &>~/Alljoyn/oprt/archer/.logs/prepare.log
+        make package/feeds/alljoyn/alljoyn/compile -j5 V=s &>~/Alljoyn/oprt/archer/.logs/build.log
+        cd ~/Alljoyn/
+        unset GET1
+        unset GET2
+        unset GET3
+        unset GET4
+        unset GET5
+        unset GET6
+        unset GET7
+        echo "All Done!"
     fi
 }
 
+# Copy all relevant OpenWRT packages to a specified router
+# NOTE: only works inside OpenWRT build directory (where "make menuconfig" is run)
+function oprt-upload() {
+  cd $(find ./ -path "*/build/openwrt/openwrt/release")
+  scp ./{dist/cpp/bin/{advtunnel,ajxmlcop,bastress2,bbclient,bbjoin,bbservice,bbsig,bbsigtest,eventsactionservice,init,ns,rawclient,rawservice,sessions,samples/AboutClient,samples/AboutListener,samples/AboutService,samples/ConfigClient,samples/ConfigService,samples/DeskTopSharedKSClient1,samples/DeskTopSharedKSClient2,samples/DeskTopSharedKSService,samples/SampleCertificateUtility,samples/SampleClientECDHE,samples/sample_rule_app,samples/SampleServiceECDHE,samples/SecureDoorConsumer,samples/SecureDoorProvider},test/cpp/bin/{abouttest,aclient,aes_ccm,ajcheck,ajtest,aservice,bastress,bbjitter,bignum,cmtest,marshal,names,propstresstest,proptester,remarshal,secmgrtest,socktest,srp,unpack}} root@$1:/tmp/
+}
 
 function logit() {
     $1 2>&1 | tee $2
 }
 
+function apk-upload() {
+    for DEVICE in "$@"; do
+        echo "Installing AllJoyn samples to $DEVICE"
+        for APP in $(find ./ -name "*.apk"); do 
+            echo "Installing $APP"
+            adb -s $DEVICE install $APP &>/dev/null
+            if [ $? -eq 0 ]; then echo "Success!"; else "Failed"; fi
+        done
+    done
+}
+
+function android-remove-alljoyn() {
+    echo "All arguments: $@"
+    for DEVICE in "$@"; do
+        AJN_PACKAGES=$(adb -s $DEVICE shell pm list packages -f | grep alljoyn)
+        if [[ $AJN_PACKAGES == '' ]]; then
+            echo "No AllJoyn packages on $DEVICE"
+        else
+            echo "Removing AllJoyn samples from $DEVICE"
+            for PACKAGE in $(adb -s $DEVICE shell pm list packages -f | grep alljoyn | sed 's:.*[a-z]*=\(org.*\):\1:'); do 
+                echo "Removing ${PACKAGE//[$'\t\r\n']} from $DEVICE"
+                adb -s $DEVICE uninstall ${PACKAGE//[$'\t\r\n']} 
+            done
+        fi
+        EVENTACTION_APP=$(adb -s $DEVICE shell pm list packages -f | grep allseen | sed 's:.*[a-z]*=\(org.[a-z][a-z]*\):\1:')
+        if [[ $EVENTACTION_APP == '' ]]; then
+            echo "Event Action App not installed on $DEVICE"
+        else
+            adb -s $DEVICE uninstall ${EVENTACTION_APP//[$'\t\r\n']}
+        fi
+    done
+}
+
 #Check if I'm in a testing environment
-unset path 
+unset path
 while true
-do 
+do
 if [[ $(find $path -maxdepth 1 -name ".bashrc" -type f -exec echo "{}" \;) ]]; then #Found $HOME before .ajn_root.flag, definitely not testing env.
     unset AJN_CORE
     unset AJTCL
